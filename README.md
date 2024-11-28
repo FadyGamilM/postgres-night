@@ -72,3 +72,16 @@ func main() {
 	log.Printf("%.4f\n", float64(salary)/10000)
 }
 ```
+
+## Constraints [Column level and Table level] : 
+- It's good to use constraints to enforce data integrity on your domains.
+```sql
+postgres=# create table users(
+postgres(#   username varchar(255),
+postgres(#   salary numeric constraint salary_must_be_positive check(salary > 0),
+postgres(#   kpi numeric constraint kpi_must_be_positive check(kpi > 0), -- column level constraint 
+postgres(#   -- table level constraint is used when we need to add constraints between columns against each others
+postgres(#   check(salary > (kpi * 2))
+postgres(# );
+CREATE TABLE
+```
