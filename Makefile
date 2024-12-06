@@ -7,4 +7,5 @@ create-db-instance:
 	  -d postgres
 
 inside-db:
-	docker exec -it 586860ce51b9be0da830c1d95306d17129b8a6f6a6a434d03d08f34cc4214f28 psql --u fady -d test
+	docker start ed95551d51957e3fe6becc16033bf3c80468e2a4bb93f83fc340e02d772f9184
+	docker exec -it ed95551d51957e3fe6becc16033bf3c80468e2a4bb93f83fc340e02d772f9184 psql --u fady -d test

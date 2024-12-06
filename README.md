@@ -85,3 +85,68 @@ postgres(#   check(salary > (kpi * 2))
 postgres(# );
 CREATE TABLE
 ```
+
+## Search text in postgres: 
+- we use `ts_vector` type to store our text as vector data type which is a `sorted list` of the atomic words with their locations from the sentence.
+- then we can use the `ts_query` type to check if our query param is inside the ts_vector list 
+```sql
+postgres=# select to_tsvector('fady gamil mahrous is a backend engineer at halan, fady is responsible');
+                                  to_tsvector                                   
+--------------------------------------------------------------------------------
+ 'backend':6 'engin':7 'fadi':1,10 'gamil':2 'halan':9 'mahrous':3 'respons':12
+(1 row)
+
+postgres=# select to_tsquery('fady');
+ to_tsquery 
+------------
+ 'fadi'
+(1 row)
+
+postgres=# select to_tsvector('fady gamil mahrous is a backend engineer at halan, fady is responsible') @@ to_tsquery('fady');
+ ?column? 
+----------
+ t
+(1 row) 
+
+postgres=# select to_tsvector('fady gamil mahrous is a backend engineer at halan, fady is responsible') @@ to_tsquery('fadi');
+ ?column? 
+----------
+ t
+(1 row)
+
+postgres=# select to_tsvector('fady gamil mahrous is a backend engineer at halan, fady is responsible') @@ to_tsquery('fadia');
+ ?column? 
+----------
+ f
+(1 row)
+```
+
+
+## Foreign Key Constraints:
+- foreign key is a concept to enforce the `referential integrity`.
+```sql
+test=# CREATE TABLE A (
+  id bigint generated always as identity primary key, -- primary key constraint 
+  x text 
+);
+CREATE TABLE
+test=# CREATE TABLE B (
+  id bigint generated always as identity primary key, -- primary key constraint 
+  a_id bigint references A(id) -- foreign key constraint
+);
+```
+
+- we cannot delete or update the parent row if it references by a child row unless we specify the level of restrictions on the FK
+1. No-Action === Restrict
+the following schema will return an error if you tried to remove parent table row before removing the childs the references this row
+```sql
+test=# CREATE TABLE A (
+  id bigint generated always as identity primary key, -- primary key constraint 
+  x text 
+);
+CREATE TABLE
+test=# CREATE TABLE B (
+  id bigint generated always as identity primary key, -- primary key constraint 
+  a_id bigint references A(id) on delete no action -- foreign key constraint
+);
+```
