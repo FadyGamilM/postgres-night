@@ -240,3 +240,37 @@ with the selectivity metric, you also should consider the access-pattern you wil
 <br>
 
 > when your query on an indexed column gives you large amount of data (more than half of the table) Postgres engine will ignore the index and perform parallel scan on the entire table.
+
+
+## What about composite b-tree index ? 
+- Always follow the rule `first -> last -> but no skipping`
+```sql
+test=# create table metadata (id bigint generated always as identity primary key, operationType varchar(50), description text, firstUserName varchar(255), lastUserName varchar(255));
+CREATE TABLE
+test=# create index firstLastOperationTypeIdx on metadata using btree(firstUserName, lastUserName, operationType);
+CREATE INDEX
+```
+
+if our read query : 
+```sql
+select from metadata
+where lastUserName = 'bla bla';
+```
+this will search using full table scan not the created index 
+
+but if we write it this way 
+```sql
+select from metadata 
+where firstUserNmae = 'bla' and lastUserName = 'bla bla';
+```
+this will use the index 
+
+but if we skip the lastUserName and write it this way 
+```sql
+select from metadata 
+where firstUserNmae = 'bla' and operationType = 'payment';
+```
+this will use the index, but this will do the following :
+![](compositeIdx.png)
+
+> keep your most common filters on the left of your composite index
