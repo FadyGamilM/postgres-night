@@ -73,20 +73,7 @@ func main() {
 }
 ```
 
-## Constraints [Column level and Table level] : 
-- It's good to use constraints to enforce data integrity on your domains.
-```sql
-postgres=# create table users(
-postgres(#   username varchar(255),
-postgres(#   salary numeric constraint salary_must_be_positive check(salary > 0),
-postgres(#   kpi numeric constraint kpi_must_be_positive check(kpi > 0), -- column level constraint 
-postgres(#   -- table level constraint is used when we need to add constraints between columns against each others
-postgres(#   check(salary > (kpi * 2))
-postgres(# );
-CREATE TABLE
-```
-
-## Search text in postgres: 
+# Search text in postgres: 
 - we use `ts_vector` type to store our text as vector data type which is a `sorted list` of the atomic words with their locations from the sentence.
 - then we can use the `ts_query` type to check if our query param is inside the ts_vector list 
 ```sql
@@ -121,6 +108,18 @@ postgres=# select to_tsvector('fady gamil mahrous is a backend engineer at halan
 (1 row)
 ```
 
+# Constraints [Column level and Table level] : 
+- It's good to use constraints to enforce data integrity on your domains.
+```sql
+postgres=# create table users(
+postgres(#   username varchar(255),
+postgres(#   salary numeric constraint salary_must_be_positive check(salary > 0),
+postgres(#   kpi numeric constraint kpi_must_be_positive check(kpi > 0), -- column level constraint 
+postgres(#   -- table level constraint is used when we need to add constraints between columns against each others
+postgres(#   check(salary > (kpi * 2))
+postgres(# );
+CREATE TABLE
+```
 
 ## Foreign Key Constraints:
 - foreign key is a concept to enforce the `referential integrity`.
@@ -151,7 +150,7 @@ test=# CREATE TABLE B (
 );
 ```
 
-## Indexes in PostgreSQL :
+# Indexes in PostgreSQL :
 ![](index-overview.png)
 
 - How data are stored into postgres ? 
@@ -274,3 +273,104 @@ this will use the index, but this will do the following :
 ![](compositeIdx.png)
 
 > keep your most common filters on the left of your composite index
+
+## composite index on two columns or separate index on each one and let postgres combining them togeather ? 
+- if we have index on col_A called idx_A and index on col_B called idx_B and index on both idx_AB 
+```sql
+select * from tableX
+where col_A = x and col_B = y;
+-- This will use the composite index because it is faster in this access pattern 
+
+select * from tableX
+where col_A = x or col_B = y;
+-- This will use the first idx to filter based on the first condition and then the second idnex and then combining both of them togeather
+```
+
+
+# Explain
+
+## What the Explain's structure ?
+- explain returns to you the result of postgres engine, and its simply a tree of nodes 
+```sql
+test=# explain select * from data;
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Seq Scan on data  (cost=0.00..21.80 rows=1180 width=41)
+(1 row)
+
+test=# explain select * from data limit 10;
+                          QUERY PLAN                           
+---------------------------------------------------------------
+ Limit  (cost=0.00..0.18 rows=10 width=41) -- and this is the parent node
+   ->  Seq Scan on data  (cost=0.00..21.80 rows=1180 width=41) -- this is a node
+(2 rows)
+
+test=# explain (format json) select * from data limit 10;
+[                                        +
+   {                                      +
+     "Plan": {                            +
+       "Node Type": "Limit",              +
+       "Parallel Aware": false,           +
+       "Async Capable": false,            +
+       "Startup Cost": 0.00,              +
+       "Total Cost": 0.18,                +
+       "Plan Rows": 10,                   +
+       "Plan Width": 41,                  +
+       "Plans": [                         +
+         {                                +
+           "Node Type": "Seq Scan",       +
+           "Parent Relationship": "Outer",+
+           "Parallel Aware": false,       +
+           "Async Capable": false,        +
+           "Relation Name": "data",       +
+           "Alias": "data",               +
+           "Startup Cost": 0.00,          +
+           "Total Cost": 21.80,           +
+           "Plan Rows": 1180,             +
+           "Plan Width": 41               +
+         }                                +
+       ]                                  +
+     }                                    +
+   }                                      +
+ ]
+
+```
+
+- what if we added a where filter ? 
+```sql
+test=# explain select * from data where name = 'fady' limit 10;
+                         QUERY PLAN                         
+------------------------------------------------------------
+ Limit  (cost=0.00..24.75 rows=6 width=41)
+   ->  Seq Scan on data  (cost=0.00..24.75 rows=6 width=41)
+         Filter: (name = 'fady'::text)
+(3 rows)
+```
+
+so simply the filter is not another child node, but its a property in the child node (seq scan node)
+
+## bitmap index scan with bitmap heap scan ?
+```sql
+test=# select count(*) from data;
+  count  
+---------
+ 1000012
+(1 row)
+
+test=# select * from data limit 2;
+ id | name  | is_pro_user 
+----+-------+-------------
+  1 | fady  | t
+  2 | gamil | f
+(2 rows)
+
+test=# explain select * from data where name = 'fady';
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
+ Bitmap Heap Scan on data  (cost=3085.25..10628.18 rows=100235 width=20)
+   Recheck Cond: (name = 'fady'::text)
+   ->  Bitmap Index Scan on data_name_idx_v2  (cost=0.00..3060.19 rows=100235 width=0)
+         Index Cond: (name = 'fady'::text)
+(4 rows)
+```
+![](bitmap-index-scan.vs.bitmap-heap-scan.png)
